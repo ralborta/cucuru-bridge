@@ -1,0 +1,74 @@
+{
+  "info": {
+    "name": "Cucuru Bridge — Sandbox",
+    "_postman_id": "8a9b1a58-0d41-4f66-bf7b-cc9b7a7a2f35",
+    "description": "Colección para probar el microservicio y el sandbox de Cucuru",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "Crear link de pago (proxy a Cucuru)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 12300,\n  \"currency\": \"ARS\",\n  \"reference\": \"CONST-INV-0001\",\n  \"payer\": { \"email\": \"cliente@demo.com\", \"name\": \"Cliente Demo\" },\n  \"metadata\": { \"source\": \"constanza\" }\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/payments/link", "host": ["{{base_url}}"], "path": ["api", "payments", "link"] }
+      }
+    },
+    {
+      "name": "Consultar pago por ID (proxy a Cucuru)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/api/payments/{{payment_id}}", "host": ["{{base_url}}"], "path": ["api", "payments", "{{payment_id}}"] }
+      }
+    },
+    {
+      "name": "Simular webhook (local/QA)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Content-Type", "value": "application/json" } ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\":\"evt_123\",\n  \"event\":\"payment.succeeded\",\n  \"data\":{\"payment_id\":\"pay_001\",\"amount\":12300},\n  \"created_at\":\"2025-11-06T20:00:00Z\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/api/webhooks/cucuru", "host": ["{{base_url}}"], "path": ["api", "webhooks", "cucuru"] }
+      }
+    },
+    {
+      "name": "Llamar directo a sandbox (salta el proxy)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Cucuru-Api-Key", "value": "{{api_key}}" },
+          { "key": "X-Cucuru-Collector-Id", "value": "{{collector_id}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": 12300,\n  \"currency\": \"ARS\",\n  \"reference\": \"CONST-INV-0001\",\n  \"payer\": { \"email\": \"cliente@demo.com\", \"name\": \"Cliente Demo\" },\n  \"metadata\": { \"source\": \"constanza\" }\n}"
+        },
+        "url": { "raw": "{{cucuru_base}}payments/links", "host": ["{{cucuru_base}}"], "path": ["payments", "links"] }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "cucuru_base", "value": "https://sandbox.api.cucuru.com/app/v1/" },
+    { "key": "api_key", "value": "REEMPLAZAR" },
+    { "key": "collector_id", "value": "REEMPLAZAR" },
+    { "key": "payment_id", "value": "pay_demo" }
+  ]
+}
+
