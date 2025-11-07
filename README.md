@@ -1,73 +1,76 @@
-# Cucuru Bridge (Railway) — Guía de desarrollo con Cursor
+# Cucuru Bridge Monitor
 
-Microservicio minimal para integrar con Cucuru: crea links de cobro (proxy) y recibe webhooks.
+Bridge de monitoreo para Cucuru con UI moderno.
 
-## 1) Instalación
-```bash
-npm i
-npm run dev   # desarrollo local
-# o
-npm start     # ejecuta con .env
-```
+## Características
 
-## 2) Variables de entorno
+- ✅ Health check del bridge
+- ✅ Gestión de webhooks (registrar, ver, eliminar)
+- ✅ Consultas de collections y settlements
+- ✅ Feed en tiempo real de webhooks recibidos
+- ✅ UI moderno con Tailwind CSS y modo oscuro
 
-Configura `.env` (y en Railway → Variables):
+## Variables de Entorno
 
-```
-PORT=3000
-CUCURU_BASE_URL=https://sandbox.api.cucuru.com/app/v1/
-CUCURU_API_KEY=REEMPLAZAR
-CUCURU_COLLECTOR_ID=REEMPLAZAR
-CUCURU_WEBHOOK_SECRET=        # si hay firma HMAC
-CUCURU_SIGNATURE_HEADER=X-Cucuru-Signature
-CUCURU_HMAC_ALGO=sha256
-```
+Las siguientes variables de entorno son requeridas:
 
-## 3) Endpoints
+- `CUCURU_BASE_URL` - URL base de la API de Cucuru (ej: https://api.cucuru.com/app/v1/)
+- `CUCURU_API_KEY` - API Key de Cucuru
+- `CUCURU_COLLECTOR_ID` - ID del collector
 
-* `GET /health` → ping.
-* `POST /api/payments/link` → proxy a `payments/links` (usa headers X-Cucuru-Api-Key / X-Cucuru-Collector-Id).
-* `GET /api/payments/:id` → proxy a `payments/{id}`.
-* `POST /api/webhooks/cucuru` → receptor de eventos (firma opcional).
+Opcionales:
 
-## 4) cURL útiles
+- `INBOUND_HEADER_NAME` - Nombre del header para autenticación entrante
+- `INBOUND_HEADER_VALUE` - Valor del header para autenticación entrante
+- `CUCURU_WEBHOOK_SECRET` - Secret para verificación HMAC
+- `CUCURU_SIGNATURE_HEADER` - Nombre del header de firma (default: X-Cucuru-Signature)
+- `CUCURU_HMAC_ALGO` - Algoritmo HMAC (default: sha256)
+- `PORT` - Puerto del servidor (default: 3000)
 
-Crear link:
+## Desarrollo Local
 
 ```bash
-curl -X POST "$CUCURU_BASE_URL/payments/links" \
-  -H "Content-Type: application/json" \
-  -H "X-Cucuru-Api-Key: $CUCURU_API_KEY" \
-  -H "X-Cucuru-Collector-Id: $CUCURU_COLLECTOR_ID" \
-  -d '{"amount":12300,"currency":"ARS","reference":"CONST-INV-0001","payer":{"email":"cliente@demo.com","name":"Cliente Demo"},"metadata":{"source":"constanza"}}'
+npm install
+npm run dev
 ```
 
-Desde tu proxy:
+El servidor se iniciará en `http://localhost:3000`
+
+## Despliegue en Vercel
+
+1. Conecta tu repositorio de GitHub a Vercel
+2. Configura las variables de entorno en el dashboard de Vercel
+3. Vercel detectará automáticamente la configuración y desplegará la aplicación
+
+O usando Vercel CLI:
 
 ```bash
-curl -X POST "http://localhost:3000/api/payments/link" \
-  -H "Content-Type: application/json" \
-  -d '{"amount":12300,"currency":"ARS","reference":"CONST-INV-0001","payer":{"email":"cliente@demo.com","name":"Cliente Demo"},"metadata":{"source":"constanza"}}'
+npm i -g vercel
+vercel
 ```
 
-Simular webhook (sin firma):
+## Estructura del Proyecto
 
-```bash
-curl -X POST "http://localhost:3000/api/webhooks/cucuru" \
-  -H "Content-Type: application/json" \
-  -d '{"id":"evt_123","event":"payment.succeeded","data":{"payment_id":"pay_001","amount":12300},"created_at":"2025-11-06T20:00:00Z"}'
+```
+├── api/
+│   └── index.ts          # Handler para Vercel
+├── public/
+│   └── index.html        # UI del monitor
+├── src/
+│   └── server.ts        # Servidor Express principal
+├── vercel.json          # Configuración de Vercel
+└── package.json
 ```
 
-## 5) Deploy en Railway
+## API Endpoints
 
-1. Conectá tu repo en **Railway → New Project → Deploy from GitHub**.
-2. Variables: `PORT`, `CUCURU_BASE_URL`, `CUCURU_API_KEY`, `CUCURU_COLLECTOR_ID` (+ firma si aplica).
-3. Copiá tu URL pública y configurá el webhook en Cucuru a `https://TU-APP.railway.app/api/webhooks/cucuru`.
-
-## 6) To-Do
-
-* Idempotencia con DB (Railway Postgres).
-* Enrutamiento por tipo de evento.
-* Act logs y métricas.
-
+- `GET /` - UI del monitor
+- `GET /health` - Health check
+- `GET /api/collections` - Consultar collections
+- `GET /api/settlements` - Consultar settlements
+- `GET /api/webhooks/last` - Últimos webhooks recibidos
+- `POST /api/webhooks/register` - Registrar webhook
+- `GET /api/webhooks/endpoint` - Ver endpoint configurado
+- `DELETE /api/webhooks/endpoint` - Eliminar endpoint
+- `POST /api/webhooks/collection_received` - Webhook de collection
+- `POST /api/webhooks/settlement_received` - Webhook de settlement
