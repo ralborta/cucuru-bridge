@@ -1,6 +1,11 @@
 import express, { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import crypto from "crypto";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // === Buffer de eventos en memoria ===
 type EventItem = { type: "collection" | "settlement"; attempt: string; ts: string; body: any; };
@@ -14,27 +19,14 @@ function pushEvent(e: EventItem) {
 const app = express();
 
 /**
- * Middleware universal:
- * - Guarda rawBody (para posible verificación HMAC).
- * - Parsea JSON si corresponde.
+ * Middleware para parsear JSON y capturar rawBody para verificación HMAC.
+ * El rawBody se guarda en req.rawBody para uso en webhooks.
  */
-app.use((req: any, _res: Response, next: NextFunction) => {
-  const chunks: Buffer[] = [];
-  req.on("data", (c: Buffer) => chunks.push(c));
-  req.on("end", () => {
-    req.rawBody = Buffer.concat(chunks);
-    // Intenta parsear si Content-Type es JSON
-    const ct = req.headers["content-type"] || "";
-    if (ct.includes("application/json")) {
-      try {
-        req.body = req.rawBody.length ? JSON.parse(req.rawBody.toString("utf8")) : {};
-      } catch {
-        req.body = {};
-      }
-    }
-    next();
-  });
-});
+app.use(express.json({
+  verify: (req: any, _res: Response, buf: Buffer) => {
+    req.rawBody = buf;
+  }
+}));
 
 // ===== ENV obligatorias / recomendadas =====
 const required = (name: string) => {
@@ -278,5 +270,19 @@ app.get("/api/webhooks/last", (req, res) => {
   res.json({ events: LAST_EVENTS.slice(0, limit) });
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`cucuru-bridge (PROD) listening on :${port}`));
+// ===== Servir archivos estáticos (UI) =====
+app.use(express.static(path.join(__dirname, "../public")));
+
+// Ruta raíz para servir el UI
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(__dirname, "../public/index.html"));
+});
+
+// Exportar app para Vercel
+export default app;
+
+// Solo iniciar servidor si no estamos en Vercel
+if (process.env.VERCEL !== "1") {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log(`cucuru-bridge (PROD) listening on :${port}`));
+}

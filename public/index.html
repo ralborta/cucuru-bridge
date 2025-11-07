@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Cucuru – Bridge Monitor</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2563eb",
+            "background-light": "#f4f7fa",
+            "background-dark": "#18181b",
+          },
+          fontFamily: {
+            display: ["Inter", "sans-serif"],
+          },
+          borderRadius: {
+            DEFAULT: "0.5rem",
+          },
+        },
+      },
+    };
+  </script>
+<style>
+    .material-symbols-outlined {
+      font-variation-settings:
+      'FILL' 0,
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 24
+    }
+    .result-box {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="flex h-screen">
+<aside class="w-64 flex-shrink-0 bg-white dark:bg-zinc-900 border-r border-slate-200 dark:border-zinc-800 flex flex-col">
+<div class="px-6 py-4 border-b border-slate-200 dark:border-zinc-800">
+<h1 class="text-xl font-bold text-slate-800 dark:text-slate-200">Cucuru</h1>
+<p class="text-xs text-slate-500 dark:text-slate-400">Bridge Monitor</p>
+</div>
+<nav class="flex-1 px-4 py-6 space-y-2">
+<a class="flex items-center px-4 py-2 text-sm font-medium rounded-md bg-blue-50 dark:bg-blue-900/50 text-primary" href="#health">
+<span class="material-symbols-outlined mr-3 text-lg">favorite</span>
+          Health
+        </a>
+<a class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800" href="#webhook">
+<span class="material-symbols-outlined mr-3 text-lg">webhook</span>
+          Webhook
+        </a>
+<a class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800" href="#consultas">
+<span class="material-symbols-outlined mr-3 text-lg">manage_search</span>
+          Consultas
+        </a>
+<a class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-zinc-800" href="#feed">
+<span class="material-symbols-outlined mr-3 text-lg">feed</span>
+          Feed
+        </a>
+</nav>
+</aside>
+<main class="flex-1 p-8 overflow-y-auto">
+<div class="max-w-4xl mx-auto">
+<header class="mb-8">
+<h1 class="text-3xl font-bold text-slate-800 dark:text-slate-100">Cucuru – Bridge Monitor</h1>
+<p class="text-slate-500 dark:text-slate-400 mt-1">Health, Webhook y Consultas (via Railway bridge)</p>
+</header>
+<div class="space-y-8">
+<section id="health" class="bg-white dark:bg-zinc-900 p-6 rounded-lg border border-slate-200 dark:border-zinc-800">
+<h2 class="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-4">1) Health del Bridge</h2>
+<button onclick="checkHealth()" class="bg-primary hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md flex items-center">
+<span class="material-symbols-outlined mr-2 text-base">api</span>
+              Consultar /api/health
+            </button>
+<div id="health-result" class="mt-4 hidden">
+<div class="bg-slate-50 dark:bg-zinc-800 p-4 rounded-md result-box">
+<pre class="text-sm text-slate-700 dark:text-slate-300" id="health-content"></pre>
+</div>
+</div>
+</section>
+<section id="webhook" class="bg-white dark:bg-zinc-900 p-6 rounded-lg border border-slate-200 dark:border-zinc-800">
+<h2 class="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-4">2) Webhook</h2>
+<div class="flex flex-wrap gap-3">
+<button onclick="registerWebhook()" class="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-md">Registrar (dispara POST de prueba)</button>
+<button onclick="getWebhook()" class="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-md">Ver endpoint</button>
+<button onclick="deleteWebhook()" class="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-md">Eliminar endpoint</button>
+</div>
+<div id="webhook-result" class="mt-4 hidden">
+<div class="bg-slate-50 dark:bg-zinc-800 p-4 rounded-md result-box">
+<pre class="text-sm text-slate-700 dark:text-slate-300" id="webhook-content"></pre>
+</div>
+</div>
+</section>
+<section id="consultas" class="bg-white dark:bg-zinc-900 p-6 rounded-lg border border-slate-200 dark:border-zinc-800">
+<h2 class="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-4">3) Consultas (collections / settlements)</h2>
+<div class="flex flex-wrap items-center gap-4">
+<div class="flex items-center gap-2">
+<label class="text-sm text-slate-600 dark:text-slate-400" for="from-date">from:</label>
+<input class="form-input w-40 bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700 rounded-md text-slate-700 dark:text-slate-300 focus:ring-primary focus:border-primary" id="from-date" type="date" value="2025-11-01"/>
+</div>
+<div class="flex items-center gap-2">
+<label class="text-sm text-slate-600 dark:text-slate-400" for="to-date">to:</label>
+<input class="form-input w-40 bg-white dark:bg-zinc-800 border-slate-300 dark:border-zinc-700 rounded-md text-slate-700 dark:text-slate-300 focus:ring-primary focus:border-primary" id="to-date" type="date" value="2025-11-07"/>
+</div>
+<div class="flex gap-3">
+<button onclick="getCollections()" class="bg-primary hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md">Collections</button>
+<button onclick="getSettlements()" class="bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200 dark:hover:bg-zinc-700 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-md">Settlements</button>
+</div>
+</div>
+<div class="mt-6 space-y-4">
+<div>
+<h3 class="font-medium text-slate-700 dark:text-slate-300 mb-2">Collections</h3>
+<div id="collections-result" class="hidden">
+<div class="bg-slate-50 dark:bg-zinc-800 p-4 rounded-md result-box">
+<pre class="text-sm text-slate-700 dark:text-slate-300" id="collections-content"></pre>
+</div>
+</div>
+<p id="collections-empty" class="text-sm text-slate-500 dark:text-slate-400">—</p>
+</div>
+<div>
+<h3 class="font-medium text-slate-700 dark:text-slate-300 mb-2">Settlements</h3>
+<div id="settlements-result" class="hidden">
+<div class="bg-slate-50 dark:bg-zinc-800 p-4 rounded-md result-box">
+<pre class="text-sm text-slate-700 dark:text-slate-300" id="settlements-content"></pre>
+</div>
+</div>
+<p id="settlements-empty" class="text-sm text-slate-500 dark:text-slate-400">—</p>
+</div>
+</div>
+</section>
+<section id="feed" class="bg-white dark:bg-zinc-900 p-6 rounded-lg border border-slate-200 dark:border-zinc-800">
+<h2 class="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">4) Feed de Webhooks (últimos 50)</h2>
+<p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Se actualiza cada ~4s (si el bridge expone /api/webhooks/last).</p>
+<button onclick="toggleFeed()" class="bg-primary hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md mb-4" id="feed-toggle">Iniciar Feed</button>
+<div id="feed-result" class="hidden">
+<div class="bg-slate-50 dark:bg-zinc-800 p-4 rounded-md result-box">
+<div id="feed-content" class="text-sm text-slate-700 dark:text-slate-300"></div>
+</div>
+</div>
+<p id="feed-empty" class="text-sm text-slate-500 dark:text-slate-400">— Sin eventos —</p>
+</section>
+</div>
+</div>
+</main>
+</div>
+
+<script>
+    let feedInterval = null;
+    let feedActive = false;
+
+    async function apiCall(endpoint, options = {}) {
+      try {
+        const response = await fetch(endpoint, {
+          ...options,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        });
+        const data = await response.json().catch(() => ({ text: await response.text() }));
+        return { ok: response.ok, status: response.status, data };
+      } catch (error) {
+        return { ok: false, error: error.message };
+      }
+    }
+
+    function showResult(elementId, contentId, result) {
+      const element = document.getElementById(elementId);
+      const content = document.getElementById(contentId);
+      element.classList.remove('hidden');
+      content.textContent = JSON.stringify(result, null, 2);
+    }
+
+    async function checkHealth() {
+      const result = await apiCall('/api/health');
+      showResult('health-result', 'health-content', result);
+    }
+
+    async function registerWebhook() {
+      const result = await apiCall('/api/webhooks/register', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      showResult('webhook-result', 'webhook-content', result);
+    }
+
+    async function getWebhook() {
+      const result = await apiCall('/api/webhooks/endpoint');
+      showResult('webhook-result', 'webhook-content', result);
+    }
+
+    async function deleteWebhook() {
+      const result = await apiCall('/api/webhooks/endpoint', {
+        method: 'DELETE',
+      });
+      showResult('webhook-result', 'webhook-content', result);
+    }
+
+    async function getCollections() {
+      const fromDate = document.getElementById('from-date').value;
+      const toDate = document.getElementById('to-date').value;
+      const result = await apiCall(`/api/collections?date_from=${fromDate}&date_to=${toDate}`);
+      
+      const resultDiv = document.getElementById('collections-result');
+      const emptyP = document.getElementById('collections-empty');
+      const content = document.getElementById('collections-content');
+      
+      if (result.ok && result.data) {
+        resultDiv.classList.remove('hidden');
+        emptyP.classList.add('hidden');
+        content.textContent = JSON.stringify(result.data, null, 2);
+      } else {
+        resultDiv.classList.add('hidden');
+        emptyP.classList.remove('hidden');
+        emptyP.textContent = `Error: ${JSON.stringify(result, null, 2)}`;
+      }
+    }
+
+    async function getSettlements() {
+      const fromDate = document.getElementById('from-date').value;
+      const toDate = document.getElementById('to-date').value;
+      const result = await apiCall(`/api/settlements?date_from=${fromDate}&date_to=${toDate}`);
+      
+      const resultDiv = document.getElementById('settlements-result');
+      const emptyP = document.getElementById('settlements-empty');
+      const content = document.getElementById('settlements-content');
+      
+      if (result.ok && result.data) {
+        resultDiv.classList.remove('hidden');
+        emptyP.classList.add('hidden');
+        content.textContent = JSON.stringify(result.data, null, 2);
+      } else {
+        resultDiv.classList.add('hidden');
+        emptyP.classList.remove('hidden');
+        emptyP.textContent = `Error: ${JSON.stringify(result, null, 2)}`;
+      }
+    }
+
+    async function updateFeed() {
+      const result = await apiCall('/api/webhooks/last?limit=50');
+      const resultDiv = document.getElementById('feed-result');
+      const emptyP = document.getElementById('feed-empty');
+      const content = document.getElementById('feed-content');
+      
+      if (result.ok && result.data && result.data.events && result.data.events.length > 0) {
+        resultDiv.classList.remove('hidden');
+        emptyP.classList.add('hidden');
+        
+        let html = '<div class="space-y-3">';
+        result.data.events.forEach((event, idx) => {
+          const typeColor = event.type === 'collection' ? 'bg-green-100 dark:bg-green-900/30' : 'bg-blue-100 dark:bg-blue-900/30';
+          const typeLabel = event.type === 'collection' ? 'COBRO' : 'LIQUIDACIÓN';
+          html += `
+            <div class="${typeColor} p-3 rounded-md border border-slate-200 dark:border-zinc-700">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-xs uppercase">${typeLabel}</span>
+                <span class="text-xs text-slate-500 dark:text-slate-400">${new Date(event.ts).toLocaleString('es-ES')}</span>
+              </div>
+              <pre class="text-xs overflow-x-auto">${JSON.stringify(event.body, null, 2)}</pre>
+            </div>
+          `;
+        });
+        html += '</div>';
+        content.innerHTML = html;
+      } else {
+        resultDiv.classList.add('hidden');
+        emptyP.classList.remove('hidden');
+        emptyP.textContent = '— Sin eventos —';
+      }
+    }
+
+    function toggleFeed() {
+      const toggleBtn = document.getElementById('feed-toggle');
+      if (feedActive) {
+        clearInterval(feedInterval);
+        feedInterval = null;
+        feedActive = false;
+        toggleBtn.textContent = 'Iniciar Feed';
+      } else {
+        updateFeed();
+        feedInterval = setInterval(updateFeed, 4000);
+        feedActive = true;
+        toggleBtn.textContent = 'Detener Feed';
+      }
+    }
+
+    // Smooth scroll para navegación
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+
