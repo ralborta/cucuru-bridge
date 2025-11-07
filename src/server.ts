@@ -2,6 +2,15 @@ import express, { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import crypto from "crypto";
 
+// === Buffer de eventos en memoria ===
+type EventItem = { type: "collection" | "settlement"; attempt: string; ts: string; body: any; };
+const LAST_EVENTS: EventItem[] = [];
+const MAX_EVENTS = 200;
+function pushEvent(e: EventItem) {
+  LAST_EVENTS.unshift(e);
+  if (LAST_EVENTS.length > MAX_EVENTS) LAST_EVENTS.pop();
+}
+
 const app = express();
 
 /**
@@ -250,6 +259,7 @@ app.post("/api/webhooks/collection_received", (req: any, res: Response) => {
   const attempt = req.header("X-Redelivery-Attempt") || "0";
   // TODO: idempotencia con req.body.collection_id / trace_id
   console.log("COBRO RECIBIDO", { attempt, payload: req.body });
+  pushEvent({ type: "collection", attempt, ts: new Date().toISOString(), body: req.body });
   res.status(200).json({ received: true });
 });
 
@@ -258,7 +268,14 @@ app.post("/api/webhooks/settlement_received", (req: any, res: Response) => {
   const attempt = req.header("X-Redelivery-Attempt") || "0";
   // TODO: idempotencia con req.body.settlement_id
   console.log("LIQUIDACIÓN RECIBIDA", { attempt, payload: req.body });
+  pushEvent({ type: "settlement", attempt, ts: new Date().toISOString(), body: req.body });
   res.status(200).json({ received: true });
+});
+
+// === Endpoint de lectura del buffer ===
+app.get("/api/webhooks/last", (req, res) => {
+  const limit = Math.max(1, Math.min(Number(req.query.limit) || 50, 200));
+  res.json({ events: LAST_EVENTS.slice(0, limit) });
 });
 
 const port = process.env.PORT || 3000;
