@@ -1,26 +1,10 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response } from "express";
 import axios from "axios";
-import crypto from "crypto";
 
 const app = express();
 
-/**
- * Middleware para conservar el raw body (necesario si el webhook firma el evento).
- * También intenta parsear JSON del body.
- */
-app.use((req: any, _res: Response, next: NextFunction) => {
-  const chunks: Buffer[] = [];
-  req.on("data", (c: Buffer) => chunks.push(c));
-  req.on("end", () => {
-    req.rawBody = Buffer.concat(chunks);
-    try {
-      req.body = req.rawBody.length ? JSON.parse(req.rawBody.toString("utf8")) : {};
-    } catch {
-      req.body = {};
-    }
-    next();
-  });
-});
+// Body parser JSON normal
+app.use(express.json({ type: "*/*" }));
 
 // Helpers de env
 const required = (name: string) => {
@@ -29,28 +13,18 @@ const required = (name: string) => {
   return v;
 };
 
-// En sandbox, coloca la base que te dieron. Debe terminar con /app/v1/ si así lo define Cucuru.
-const BASE = required("CUCURU_BASE_URL");
+const BASE = required("CUCURU_BASE_URL"); // https://api.cucuru.com/app/v1/
 const API_KEY = required("CUCURU_API_KEY");
 const COLLECTOR = required("CUCURU_COLLECTOR_ID");
 
-function verifySignature(req: any): boolean {
-  const secret = process.env.CUCURU_WEBHOOK_SECRET;
-  if (!secret) return true; // si no hay secret, no validamos (modo dev/QA)
-  const headerName = process.env.CUCURU_SIGNATURE_HEADER || "X-Cucuru-Signature";
-  const algo = (process.env.CUCURU_HMAC_ALGO || "sha256") as string;
-  const signature = req.header(headerName);
-  if (!signature) return false;
+const INBOUND_HEADER_NAME = process.env.INBOUND_HEADER_NAME || "";
+const INBOUND_HEADER_VALUE = process.env.INBOUND_HEADER_VALUE || "";
 
-  const digest = crypto.createHmac(algo, secret).update(req.rawBody).digest("hex");
-
-  // Si la firma viene en hex. Si te la dan en base64, adaptar:
-  // const digestB64 = crypto.createHmac(algo, secret).update(req.rawBody).digest("base64");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
-  } catch {
-    return false;
-  }
+function cucuruHeaders() {
+  return {
+    "X-Cucuru-Api-Key": API_KEY,
+    "X-Cucuru-Collector-Id": COLLECTOR,
+  };
 }
 
 app.get("/health", (_req: Request, res: Response) => {
@@ -63,8 +37,7 @@ app.post("/api/payments/link", async (req: Request, res: Response) => {
     const r = await axios.post(`${BASE}payments/links`, req.body, {
       headers: {
         "Content-Type": "application/json",
-        "X-Cucuru-Api-Key": API_KEY,
-        "X-Cucuru-Collector-Id": COLLECTOR
+        ...cucuruHeaders(),
       },
       timeout: 15000
     });
@@ -80,10 +53,7 @@ app.post("/api/payments/link", async (req: Request, res: Response) => {
 app.get("/api/payments/:id", async (req: Request, res: Response) => {
   try {
     const r = await axios.get(`${BASE}payments/${req.params.id}`, {
-      headers: {
-        "X-Cucuru-Api-Key": API_KEY,
-        "X-Cucuru-Collector-Id": COLLECTOR
-      },
+      headers: cucuruHeaders(),
       timeout: 10000
     });
     res.status(200).json(r.data);
@@ -94,18 +64,112 @@ app.get("/api/payments/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Webhook receptor
-app.post("/api/webhooks/cucuru", (req: any, res: Response) => {
-  if (!verifySignature(req)) {
-    return res.status(401).json({ ok: false, error: "invalid_signature" });
+// GET /api/collections?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+app.get("/api/collections", async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const r = await axios.get(`${BASE}collection/collections`, {
+      headers: cucuruHeaders(),
+      params: { date_from, date_to },
+      timeout: 15000,
+    });
+    res.status(200).json(r.data);
+  } catch (err: any) {
+    res.status(err?.response?.status || 500).json({ error: "upstream_error", detail: err?.response?.data || err.message });
   }
-  const { id, event, data, created_at } = req.body || {};
-  // TODO: idempotencia -> guardar id del evento y evitar reprocesar
-  // TODO: enrutamiento -> actuar según tipo de evento (payment.succeeded, failed, expired, etc.)
-  console.log("WEBHOOK RECIBIDO:", { id, event, created_at });
-  return res.status(200).json({ received: true });
+});
+
+// GET /api/settlements?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD
+app.get("/api/settlements", async (req, res) => {
+  try {
+    const { date_from, date_to } = req.query;
+    const r = await axios.get(`${BASE}collection/settlements`, {
+      headers: cucuruHeaders(),
+      params: { date_from, date_to },
+      timeout: 15000,
+    });
+    res.status(200).json(r.data);
+  } catch (err: any) {
+    res.status(err?.response?.status || 500).json({ error: "upstream_error", detail: err?.response?.data || err.message });
+  }
+});
+
+// POST /api/webhooks/register  (registra o modifica tu endpoint en Cucuru)
+app.post("/api/webhooks/register", async (req, res) => {
+  try {
+    const baseUrl = (req.body?.url as string) || "https://cucuru-bridge-production.up.railway.app/api/webhooks";
+    const header = req.body?.header || (
+      INBOUND_HEADER_NAME && INBOUND_HEADER_VALUE
+        ? { name: INBOUND_HEADER_NAME, value: INBOUND_HEADER_VALUE }
+        : undefined
+    );
+    const payload: any = { url: baseUrl };
+    if (header) payload.header = header;
+
+    const r = await axios.post(`${BASE}collection/webhooks/endpoint`, payload, {
+      headers: { ...cucuruHeaders(), "Content-Type": "application/json" },
+      timeout: 15000,
+    });
+    res.status(200).json(r.data);
+  } catch (err: any) {
+    res.status(err?.response?.status || 500).json({ error: "upstream_error", detail: err?.response?.data || err.message });
+  }
+});
+
+// GET /api/webhooks/endpoint
+app.get("/api/webhooks/endpoint", async (_req, res) => {
+  try {
+    const r = await axios.get(`${BASE}collection/webhooks/endpoint`, { headers: cucuruHeaders(), timeout: 10000 });
+    res.status(200).json(r.data);
+  } catch (err: any) {
+    res.status(err?.response?.status || 500).json({ error: "upstream_error", detail: err?.response?.data || err.message });
+  }
+});
+
+// DELETE /api/webhooks/endpoint
+app.delete("/api/webhooks/endpoint", async (_req, res) => {
+  try {
+    const r = await axios.delete(`${BASE}collection/webhooks/endpoint`, { headers: cucuruHeaders(), timeout: 10000 });
+    res.status(200).json(r.data);
+  } catch (err: any) {
+    res.status(err?.response?.status || 500).json({ error: "upstream_error", detail: err?.response?.data || err.message });
+  }
+});
+
+function verifyInboundHeader(req: Request): boolean {
+  if (!INBOUND_HEADER_NAME || !INBOUND_HEADER_VALUE) return true; // validación desactivada
+  return req.header(INBOUND_HEADER_NAME) === INBOUND_HEADER_VALUE;
+}
+
+function rejectIfInvalidHeader(req: Request, res: Response): boolean {
+  if (!verifyInboundHeader(req)) {
+    res.status(401).json({ ok: false, error: "invalid_inbound_header" });
+    return true;
+  }
+  return false;
+}
+
+// Endpoints entrantes (Cucuru te golpea estas URLs)
+// Registrá en Cucuru esta URL base: https://cucuru-bridge-production.up.railway.app/api/webhooks
+// Cucuru llamará:
+// POST /api/webhooks/collection_received
+// POST /api/webhooks/settlement_received
+
+app.post("/api/webhooks/collection_received", (req, res) => {
+  if (rejectIfInvalidHeader(req, res)) return;
+  const attempt = req.header("X-Redelivery-Attempt") || "0";
+  console.log("COBRO RECIBIDO", { attempt, payload: req.body });
+  // TODO: idempotencia y actualización de orden/factura
+  res.status(200).json({ received: true });
+});
+
+app.post("/api/webhooks/settlement_received", (req, res) => {
+  if (rejectIfInvalidHeader(req, res)) return;
+  const attempt = req.header("X-Redelivery-Attempt") || "0";
+  console.log("LIQUIDACIÓN RECIBIDA", { attempt, payload: req.body });
+  // TODO: idempotencia y actualización de ledger/conciliación
+  res.status(200).json({ received: true });
 });
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`cucuru-bridge listening on :${port}`));
-
