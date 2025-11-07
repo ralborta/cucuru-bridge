@@ -271,11 +271,13 @@ app.get("/api/webhooks/last", (req, res) => {
 });
 
 // ===== Servir archivos estáticos (UI) =====
-app.use(express.static(path.join(__dirname, "../public")));
+const publicPath = path.join(__dirname, "../public");
+app.use(express.static(publicPath));
 
 // Ruta raíz para servir el UI
 app.get("/", (_req, res) => {
-  res.sendFile(path.join(__dirname, "../public/index.html"));
+  const indexPath = path.join(publicPath, "index.html");
+  res.sendFile(indexPath);
 });
 
 // Exportar app para Vercel
